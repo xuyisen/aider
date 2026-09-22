@@ -15,6 +15,40 @@
         //"supports_tool_choice": true,
         "supports_prompt_caching": true
     },
+    "gpt-4-32k": {
+        "max_tokens": 32768,
+        "max_input_tokens": 32768,
+        "max_output_tokens": 4096,
+        "input_cost_per_token": 0.00006,
+        "output_cost_per_token": 0.00012,
+        "litellm_provider": "openai",
+        "mode": "chat",
+        "supports_function_calling": true,
+        "supports_tool_choice": true
+    },
+    "gpt-4-32k-0314": {
+        "max_tokens": 32768,
+        "max_input_tokens": 32768,
+        "max_output_tokens": 4096,
+        "input_cost_per_token": 0.00006,
+        "output_cost_per_token": 0.00012,
+        "litellm_provider": "openai",
+        "mode": "chat",
+        "supports_function_calling": true,
+        "supports_tool_choice": true
+    },
+    "gpt-4-32k-0613": {
+        "max_tokens": 32768,
+        "max_input_tokens": 32768,
+        "max_output_tokens": 4096,
+        "input_cost_per_token": 0.00006,
+        "output_cost_per_token": 0.00012,
+        "litellm_provider": "openai",
+        "mode": "chat",
+        "supports_function_calling": true,
+        "supports_tool_choice": true
+    },
+
     "openrouter/deepseek/deepseek-r1:free": {
         "max_tokens": 8192,
         "max_input_tokens": 64000,

@@ -1,13 +1,13 @@
 import time
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from requests.exceptions import ConnectionError, ReadTimeout
 
 import aider
 from aider.coders import Coder
 from aider.commands import Commands
-from aider.help import Help, fname_to_url
+from aider.help import Help, fname_to_url, get_help_extra_package, install_help_extra
 from aider.io import InputOutput
 from aider.models import Model
 
@@ -97,7 +97,9 @@ class TestHelp(unittest.TestCase):
 
     def test_fname_to_url_unix(self):
         # Test relative Unix-style paths
-        self.assertEqual(fname_to_url("website/docs/index.md"), "https://aider.chat/docs")
+        self.assertEqual(
+            fname_to_url("website/docs/index.md"), "https://aider.chat/docs"
+        )
         self.assertEqual(
             fname_to_url("website/docs/usage.md"), "https://aider.chat/docs/usage.html"
         )
@@ -105,17 +107,22 @@ class TestHelp(unittest.TestCase):
 
         # Test absolute Unix-style paths
         self.assertEqual(
-            fname_to_url("/home/user/project/website/docs/index.md"), "https://aider.chat/docs"
+            fname_to_url("/home/user/project/website/docs/index.md"),
+            "https://aider.chat/docs",
         )
         self.assertEqual(
             fname_to_url("/home/user/project/website/docs/usage.md"),
             "https://aider.chat/docs/usage.html",
         )
-        self.assertEqual(fname_to_url("/home/user/project/website/_includes/header.md"), "")
+        self.assertEqual(
+            fname_to_url("/home/user/project/website/_includes/header.md"), ""
+        )
 
     def test_fname_to_url_windows(self):
         # Test relative Windows-style paths
-        self.assertEqual(fname_to_url(r"website\docs\index.md"), "https://aider.chat/docs")
+        self.assertEqual(
+            fname_to_url(r"website\docs\index.md"), "https://aider.chat/docs"
+        )
         self.assertEqual(
             fname_to_url(r"website\docs\usage.md"), "https://aider.chat/docs/usage.html"
         )
@@ -123,13 +130,16 @@ class TestHelp(unittest.TestCase):
 
         # Test absolute Windows-style paths
         self.assertEqual(
-            fname_to_url(r"C:\Users\user\project\website\docs\index.md"), "https://aider.chat/docs"
+            fname_to_url(r"C:\Users\user\project\website\docs\index.md"),
+            "https://aider.chat/docs",
         )
         self.assertEqual(
             fname_to_url(r"C:\Users\user\project\website\docs\usage.md"),
             "https://aider.chat/docs/usage.html",
         )
-        self.assertEqual(fname_to_url(r"C:\Users\user\project\website\_includes\header.md"), "")
+        self.assertEqual(
+            fname_to_url(r"C:\Users\user\project\website\_includes\header.md"), ""
+        )
 
     def test_fname_to_url_edge_cases(self):
         # Test paths that don't contain 'website'
@@ -141,6 +151,35 @@ class TestHelp(unittest.TestCase):
 
         # Test path with 'website' in the wrong place
         self.assertEqual(fname_to_url("/home/user/website_project/docs/index.md"), "")
+
+    def test_get_help_extra_package_local_checkout(self):
+        """Test that get_help_extra_package returns '.[help]' when pyproject.toml exists at repo root."""
+        result = get_help_extra_package()
+        self.assertEqual(result, ".[help]")
+
+    def test_get_help_extra_package_installed_release(self):
+        """Test that get_help_extra_package returns pinned version when no pyproject.toml."""
+        with patch("aider.help.Path.exists", return_value=False):
+            result = get_help_extra_package()
+            self.assertEqual(result, f"aider-chat[help]=={aider.__version__}")
+
+    def test_install_help_extra_passes_correct_requirement(self):
+        """Test that install_help_extra passes the resolved requirement to check_pip_install_extra."""
+        from aider import utils as aider_utils
+
+        io = InputOutput(pretty=False, yes=True)
+
+        with patch.object(aider_utils, "check_pip_install_extra") as mock_check:
+            install_help_extra(io)
+
+            # Verify check_pip_install_extra was called
+            mock_check.assert_called_once()
+
+            # Verify the pip_install_cmd contains the correct package reference
+            args, _ = mock_check.call_args
+            pip_install_cmd = args[3]  # pip_install_cmd is the 4th positional arg
+            expected_package = get_help_extra_package()
+            self.assertEqual(pip_install_cmd[0], expected_package)
 
 
 if __name__ == "__main__":

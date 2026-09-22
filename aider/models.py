@@ -15,7 +15,7 @@ import json5
 import yaml
 from PIL import Image
 
-from aider.dump import dump  # noqa: F401
+from aider.dump import dump
 from aider.llm import litellm
 from aider.sendchat import ensure_alternating_roles, sanity_check_messages
 from aider.utils import check_pip_install_extra
@@ -148,6 +148,20 @@ class ModelInfoManager:
         self.local_model_metadata = {}
         self.verify_ssl = True
         self._cache_loaded = False
+        self._local_metadata_loaded = False
+        self._load_local_model_metadata()
+
+    def _load_local_model_metadata(self):
+        if self._local_metadata_loaded:
+            return
+        self._local_metadata_loaded = True
+        try:
+            text = importlib.resources.open_text("aider.resources", "model-metadata.json").read()
+            data = json5.loads(text)
+            if data:
+                self.local_model_metadata.update(data)
+        except Exception:
+            pass
 
     def set_verify_ssl(self, verify_ssl):
         self.verify_ssl = verify_ssl
@@ -236,6 +250,20 @@ class ModelInfoManager:
             if openrouter_info:
                 return openrouter_info
 
+        # If we have no info, try to infer context window from model name
+        if not cached_info or "max_input_tokens" not in cached_info:
+            # Check if model name contains a token count hint (e.g., "32k", "16k", "128k")
+            import re
+            match = re.search(r'(\d+)k', model.lower())
+            if match:
+                context_size = int(match.group(1)) * 1024
+                if not cached_info:
+                    cached_info = {}
+                if "max_input_tokens" not in cached_info:
+                    cached_info["max_input_tokens"] = context_size
+                if "max_tokens" not in cached_info:
+                    cached_info["max_tokens"] = context_size
+
         return cached_info
 
     def fetch_openrouter_model_info(self, model):
@@ -311,6 +339,10 @@ class Model(ModelSettings):
         )
 
         self.info = self.get_model_info(model)
+
+        # If not already known, detect vision capability from model name
+        if not self.info.get('supports_vision') and 'vision' in model.lower():
+            self.info['supports_vision'] = True
 
         # Are all needed keys/params available?
         res = self.validate_environment()

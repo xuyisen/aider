@@ -24,6 +24,7 @@ from aider.utils import Spinner
 # tree_sitter is throwing a FutureWarning
 warnings.simplefilter("ignore", category=FutureWarning)
 from grep_ast.tsl import USING_TSL_PACK, get_language, get_parser  # noqa: E402
+import tree_sitter
 
 Tag = namedtuple("Tag", "rel_fname fname line name kind".split())
 
@@ -280,11 +281,30 @@ class RepoMap:
         code = self.io.read_text(fname)
         if not code:
             return
-        tree = parser.parse(bytes(code, "utf-8"))
+        try:
+            tree = parser.parse(bytes(code, "utf-8"))
 
-        # Run the tags queries
-        query = language.query(query_scm)
-        captures = query.captures(tree.root_node)
+            # Run the tags queries
+            captures = {}
+            try:
+                query = tree_sitter.Query(language, query_scm)
+                cursor = tree_sitter.QueryCursor(query)
+                if cursor is not None:
+                    for _, captures_dict in cursor.matches(tree.root_node):
+                        for name, nodes in captures_dict.items():
+                            captures.setdefault(name, []).extend(nodes)
+                else:
+                    raise ValueError("QueryCursor is None")
+            except Exception:
+                # Fallback: try the older API (language.query)
+                try:
+                    if hasattr(language, 'query'):
+                        query = language.query(query_scm)
+                        captures = query.captures(tree.root_node)
+                except Exception:
+                    return
+        except Exception:
+            return
 
         saw = set()
         if USING_TSL_PACK:
