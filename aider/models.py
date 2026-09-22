@@ -148,6 +148,7 @@ class ModelInfoManager:
         self.local_model_metadata = {}
         self.verify_ssl = True
         self._cache_loaded = False
+        self._load_local_model_metadata()
 
     def set_verify_ssl(self, verify_ssl):
         self.verify_ssl = verify_ssl
@@ -190,6 +191,16 @@ class ModelInfoManager:
                 self.cache_file.write_text("{}")
             except OSError:
                 pass
+
+    def _load_local_model_metadata(self):
+        """Load model metadata from the bundled model-metadata.json resource file."""
+        try:
+            with importlib.resources.open_text("aider.resources", "model-metadata.json") as f:
+                data = json5.load(f)
+                if data:
+                    self.local_model_metadata.update(data)
+        except Exception:
+            pass
 
     def get_model_from_cached_json_db(self, model):
         data = self.local_model_metadata.get(model)

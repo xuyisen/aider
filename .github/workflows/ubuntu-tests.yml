@@ -1,31 +1,12 @@
 name: Ubuntu Python Tests
 
-on:
-  push:
-    paths-ignore:
-      - 'aider/website/**'
-      - 'README.md'
-      - 'HISTORY.md'
-      - '.github/workflows/*'
-      - '!.github/workflows/ubuntu-tests.yml'
-    branches:
-      - main
-  pull_request:
-    paths-ignore:
-      - 'aider/website/**'
-      - 'README.md'
-      - 'HISTORY.md'
-      - '.github/workflows/*'
-      - '!.github/workflows/ubuntu-tests.yml'
-    branches:
-      - main
-
+on: push
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ['3.10', '3.11', '3.12']
 
     steps:
     - name: Check out repository
