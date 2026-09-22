@@ -154,8 +154,23 @@ class ModelInfoManager:
         self.verify_ssl = True
         self._cache_loaded = False
 
+        # Load local model metadata from bundled resources
+        self._load_local_model_metadata()
+
         # Manager for the cached OpenRouter model database
         self.openrouter_manager = OpenRouterModelManager()
+
+    def _load_local_model_metadata(self):
+        """Load model metadata bundled with the package into local_model_metadata."""
+        try:
+            with importlib.resources.open_text(
+                "aider.resources", "model-metadata.json"
+            ) as f:
+                model_def = json5.load(f)
+            if model_def:
+                self.local_model_metadata.update(model_def)
+        except Exception as ex:
+            print(f"Error loading bundled model metadata: {ex}")
 
     def set_verify_ssl(self, verify_ssl):
         self.verify_ssl = verify_ssl

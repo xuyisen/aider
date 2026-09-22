@@ -275,48 +275,53 @@ class RepoMap:
             return
 
         query_scm = get_scm_fname(lang)
-        if not query_scm.exists():
+        if not query_scm or not query_scm.exists():
             return
         query_scm = query_scm.read_text()
 
         code = self.io.read_text(fname)
         if not code:
             return
-        tree = parser.parse(bytes(code, "utf-8"))
 
-        # Run the tags queries
-        query = language.query(query_scm)
-        captures = query.captures(tree.root_node)
+        try:
+            tree = parser.parse(bytes(code, "utf-8"))
 
-        saw = set()
-        if USING_TSL_PACK:
-            all_nodes = []
-            for tag, nodes in captures.items():
-                all_nodes += [(node, tag) for node in nodes]
-        else:
-            all_nodes = list(captures)
+            # Run the tags queries
+            query = language.query(query_scm)
+            captures = query.captures(tree.root_node)
 
-        for node, tag in all_nodes:
-            if tag.startswith("name.definition."):
-                kind = "def"
-            elif tag.startswith("name.reference."):
-                kind = "ref"
+            saw = set()
+            if USING_TSL_PACK:
+                all_nodes = []
+                for tag, nodes in captures.items():
+                    all_nodes += [(node, tag) for node in nodes]
             else:
-                continue
+                all_nodes = list(captures)
 
-            saw.add(kind)
+            for node, tag in all_nodes:
+                if tag.startswith("name.definition."):
+                    kind = "def"
+                elif tag.startswith("name.reference."):
+                    kind = "ref"
+                else:
+                    continue
 
-            result = Tag(
-                rel_fname=rel_fname,
-                fname=fname,
-                name=node.text.decode("utf-8"),
-                kind=kind,
-                line=node.start_point[0],
-            )
+                saw.add(kind)
 
-            yield result
+                result = Tag(
+                    rel_fname=rel_fname,
+                    fname=fname,
+                    name=node.text.decode("utf-8"),
+                    kind=kind,
+                    line=node.start_point[0],
+                )
 
-        if "ref" in saw:
+                yield result
+
+            if "ref" in saw:
+                return
+        except Exception as err:
+            print(f"Error extracting tags from {fname}: {err}")
             return
         if "def" not in saw:
             return

@@ -15,9 +15,39 @@ from aider.help_pats import exclude_website_pats
 warnings.simplefilter("ignore", category=FutureWarning)
 
 
+def get_help_extra_package():
+    """Return the pip package reference for installing help extras.
+
+    For source checkouts (running from development), return the local project root
+    with extras. For installed releases, return the versioned package with extras.
+    """
+    try:
+        import aider
+        aider_path = Path(aider.__file__).resolve()
+        aider_dir = aider_path.parent
+        project_root = aider_dir.parent
+        pyproject_path = project_root / "pyproject.toml"
+
+        if pyproject_path.exists():
+            content = pyproject_path.read_text()
+            if (
+                'name = "aider-chat"' in content
+                or "name = 'aider-chat'" in content
+            ):
+                # Source checkout - return local path with extras
+                return f"{project_root}[help]"
+    except OSError:
+        pass
+
+    # Installed release - return versioned package with extras
+    from aider import __version__
+    return f"aider-chat[help]=={__version__}"
+
+
 def install_help_extra(io):
+    package_ref = get_help_extra_package()
     pip_install_cmd = [
-        "aider-chat[help]",
+        package_ref,
         "--extra-index-url",
         "https://download.pytorch.org/whl/cpu",
     ]
@@ -35,8 +65,7 @@ def get_package_files():
         if path.is_file():
             yield path
         elif path.is_dir():
-            for subpath in path.rglob("*.md"):
-                yield subpath
+            yield from path.rglob("*.md")
 
 
 def fname_to_url(filepath):
@@ -115,11 +144,11 @@ def get_index():
                 text=importlib_resources.files("aider.website")
                 .joinpath(fname)
                 .read_text(encoding="utf-8"),
-                metadata=dict(
-                    filename=fname.name,
-                    extension=fname.suffix,
-                    url=fname_to_url(str(fname)),
-                ),
+                metadata={
+                    "filename": fname.name,
+                    "extension": fname.suffix,
+                    "url": fname_to_url(str(fname)),
+                },
             )
             nodes += parser.get_nodes_from_documents([doc])
 
@@ -149,7 +178,7 @@ class Help:
 
 # Relevant docs:
 
-"""  # noqa: E231
+"""
 
         for node in nodes:
             url = node.metadata.get("url", "")
