@@ -6,6 +6,7 @@ import shutil
 import warnings
 from pathlib import Path
 
+import importlib.metadata
 import importlib_resources
 
 from aider import __version__, utils
@@ -17,7 +18,7 @@ warnings.simplefilter("ignore", category=FutureWarning)
 
 def install_help_extra(io):
     pip_install_cmd = [
-        "aider-chat[help]",
+        importlib.metadata.packages_distributions()["aider"][0] + "[help]",
         "--extra-index-url",
         "https://download.pytorch.org/whl/cpu",
     ]

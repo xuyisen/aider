@@ -236,7 +236,7 @@ scikit-learn==1.7.0
     # via
     #   -c requirements/common-constraints.txt
     #   sentence-transformers
-scipy==1.15.3
+scipy<1.14.0
     # via
     #   -c requirements/common-constraints.txt
     #   scikit-learn
