@@ -9,13 +9,12 @@ import sys
 import time
 from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import Optional, Union
 
 import json5
 import yaml
 from PIL import Image
 
-from aider.dump import dump  # noqa: F401
+from aider.dump import dump
 from aider.llm import litellm
 from aider.openrouter import OpenRouterModelManager
 from aider.sendchat import ensure_alternating_roles, sanity_check_messages
@@ -107,25 +106,25 @@ class ModelSettings:
     # Model class needs to have each of these as well
     name: str
     edit_format: str = "whole"
-    weak_model_name: Optional[str] = None
+    weak_model_name: str | None = None
     use_repo_map: bool = False
     send_undo_reply: bool = False
     lazy: bool = False
     overeager: bool = False
     reminder: str = "user"
     examples_as_sys_msg: bool = False
-    extra_params: Optional[dict] = None
+    extra_params: dict | None = None
     cache_control: bool = False
     caches_by_default: bool = False
     use_system_prompt: bool = True
-    use_temperature: Union[bool, float] = True
+    use_temperature: bool | float = True
     streaming: bool = True
-    editor_model_name: Optional[str] = None
-    editor_edit_format: Optional[str] = None
-    reasoning_tag: Optional[str] = None
-    remove_reasoning: Optional[str] = None  # Deprecated alias for reasoning_tag
-    system_prompt_prefix: Optional[str] = None
-    accepts_settings: Optional[list] = None
+    editor_model_name: str | None = None
+    editor_edit_format: str | None = None
+    reasoning_tag: str | None = None
+    remove_reasoning: str | None = None  # Deprecated alias for reasoning_tag
+    system_prompt_prefix: str | None = None
+    accepts_settings: list | None = None
 
 
 # Load model settings from package resource
@@ -153,6 +152,20 @@ class ModelInfoManager:
 
         # Manager for the cached OpenRouter model database
         self.openrouter_manager = OpenRouterModelManager()
+
+        # Load model metadata from the package resource
+        try:
+            resource_metadata = importlib.resources.files("aider.resources").joinpath(
+                "model-metadata.json"
+            )
+            if resource_metadata.exists():
+                import json5
+
+                data = json5.loads(resource_metadata.read_text())
+                if data:
+                    self.local_model_metadata.update(data)
+        except Exception:
+            pass
 
     def set_verify_ssl(self, verify_ssl):
         self.verify_ssl = verify_ssl
@@ -183,7 +196,9 @@ class ModelInfoManager:
             import requests
 
             # Respect the --no-verify-ssl switch
-            response = requests.get(self.MODEL_INFO_URL, timeout=5, verify=self.verify_ssl)
+            response = requests.get(
+                self.MODEL_INFO_URL, timeout=5, verify=self.verify_ssl
+            )
             if response.status_code == 200:
                 self.content = response.json()
                 try:
@@ -199,9 +214,21 @@ class ModelInfoManager:
                 pass
 
     def get_model_from_cached_json_db(self, model):
+        # Check local metadata for exact match
         data = self.local_model_metadata.get(model)
-        if data:
+        if data and self._is_complete_entry(data):
             return data
+
+        # Check local metadata with provider-prefixed lookup
+        pieces = model.split("/")
+        if len(pieces) == 2:
+            data = self.local_model_metadata.get(pieces[1])
+            if (
+                data
+                and data.get("litellm_provider") == pieces[0]
+                and self._is_complete_entry(data)
+            ):
+                return data
 
         # Ensure cache is loaded before checking content
         self._load_cache()
@@ -213,16 +240,24 @@ class ModelInfoManager:
             return dict()
 
         info = self.content.get(model, dict())
-        if info:
+        if info and self._is_complete_entry(info):
             return info
 
-        pieces = model.split("/")
         if len(pieces) == 2:
             info = self.content.get(pieces[1])
-            if info and info.get("litellm_provider") == pieces[0]:
+            if (
+                info
+                and info.get("litellm_provider") == pieces[0]
+                and self._is_complete_entry(info)
+            ):
                 return info
 
         return dict()
+
+    def _is_complete_entry(self, entry):
+        """Check if a metadata entry has the required fields."""
+        required_fields = ["max_input_tokens", "max_tokens"]
+        return all(field in entry for field in required_fields)
 
     def get_model_info(self, model):
         cached_info = self.get_model_from_cached_json_db(model)
@@ -236,7 +271,22 @@ class ModelInfoManager:
                     print(str(ex))
 
         if litellm_info:
-            return litellm_info
+            # Merge litellm_info with cached_info, with cached_info taking precedence
+            if cached_info:
+                cached_info = {**litellm_info, **cached_info}
+            else:
+                cached_info = litellm_info
+
+        # If cached_info is incomplete, try to fill in missing fields from litellm
+        if cached_info and not self._is_complete_entry(cached_info):
+            if not litellm_info and (litellm._lazy_module or not cached_info):
+                try:
+                    litellm_info = litellm.get_model_info(model)
+                except Exception as ex:
+                    if "model_prices_and_context_window.json" not in str(ex):
+                        print(str(ex))
+            if litellm_info:
+                cached_info = {**litellm_info, **cached_info}
 
         if not cached_info and model.startswith("openrouter/"):
             # First try using the locally cached OpenRouter model database
@@ -271,7 +321,9 @@ class ModelInfoManager:
             import re
 
             if re.search(
-                rf"The model\s*.*{re.escape(url_part)}.* is not available", html, re.IGNORECASE
+                rf"The model\s*.*{re.escape(url_part)}.* is not available",
+                html,
+                re.IGNORECASE,
             ):
                 print(f"\033[91mError: Model '{url_part}' is not available\033[0m")
                 return {}
@@ -282,10 +334,20 @@ class ModelInfoManager:
                 context_size = int(context_str)
             else:
                 context_size = None
-            input_cost_match = re.search(r"\$\s*([\d.]+)\s*/M input tokens", text, re.IGNORECASE)
-            output_cost_match = re.search(r"\$\s*([\d.]+)\s*/M output tokens", text, re.IGNORECASE)
-            input_cost = float(input_cost_match.group(1)) / 1000000 if input_cost_match else None
-            output_cost = float(output_cost_match.group(1)) / 1000000 if output_cost_match else None
+            input_cost_match = re.search(
+                r"\$\s*([\d.]+)\s*/M input tokens", text, re.IGNORECASE
+            )
+            output_cost_match = re.search(
+                r"\$\s*([\d.]+)\s*/M output tokens", text, re.IGNORECASE
+            )
+            input_cost = (
+                float(input_cost_match.group(1)) / 1000000 if input_cost_match else None
+            )
+            output_cost = (
+                float(output_cost_match.group(1)) / 1000000
+                if output_cost_match
+                else None
+            )
             if context_size is None or input_cost is None or output_cost is None:
                 return {}
             params = {
@@ -306,7 +368,12 @@ model_info_manager = ModelInfoManager()
 
 class Model(ModelSettings):
     def __init__(
-        self, model, weak_model=None, editor_model=None, editor_edit_format=None, verbose=False
+        self,
+        model,
+        weak_model=None,
+        editor_model=None,
+        editor_edit_format=None,
+        verbose=False,
     ):
         # Map any alias to its canonical name
         model = MODEL_ALIASES.get(model, model)
@@ -392,7 +459,9 @@ class Model(ModelSettings):
 
             # Deep merge the extra_params dicts
             for key, value in self.extra_model_settings.extra_params.items():
-                if isinstance(value, dict) and isinstance(self.extra_params.get(key), dict):
+                if isinstance(value, dict) and isinstance(
+                    self.extra_params.get(key), dict
+                ):
                     # For nested dicts, merge recursively
                     self.extra_params[key] = {**self.extra_params[key], **value}
                 else:
@@ -704,7 +773,8 @@ class Model(ModelSettings):
 
         # If missing AWS credential keys but AWS_PROFILE is set, consider AWS credentials valid
         if res["missing_keys"] and any(
-            key in ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"] for key in res["missing_keys"]
+            key in ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
+            for key in res["missing_keys"]
         ):
             if model.startswith("bedrock/") or model.startswith("us.anthropic."):
                 if os.environ.get("AWS_PROFILE"):
@@ -802,9 +872,14 @@ class Model(ModelSettings):
             if self.name.startswith("openrouter/"):
                 if "extra_body" not in self.extra_params:
                     self.extra_params["extra_body"] = {}
-                self.extra_params["extra_body"]["reasoning"] = {"max_tokens": num_tokens}
+                self.extra_params["extra_body"]["reasoning"] = {
+                    "max_tokens": num_tokens
+                }
             else:
-                self.extra_params["thinking"] = {"type": "enabled", "budget_tokens": num_tokens}
+                self.extra_params["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": num_tokens,
+                }
 
     def get_raw_thinking_tokens(self):
         """Get formatted thinking token budget if available"""
@@ -821,7 +896,8 @@ class Model(ModelSettings):
                     budget = self.extra_params["extra_body"]["reasoning"]["max_tokens"]
             # Check for standard thinking format
             elif (
-                "thinking" in self.extra_params and "budget_tokens" in self.extra_params["thinking"]
+                "thinking" in self.extra_params
+                and "budget_tokens" in self.extra_params["thinking"]
             ):
                 budget = self.extra_params["thinking"]["budget_tokens"]
 
@@ -898,7 +974,10 @@ class Model(ModelSettings):
         if functions is not None:
             function = functions[0]
             kwargs["tools"] = [dict(type="function", function=function)]
-            kwargs["tool_choice"] = {"type": "function", "function": {"name": function["name"]}}
+            kwargs["tool_choice"] = {
+                "type": "function",
+                "function": {"name": function["name"]},
+            }
         if self.extra_params:
             kwargs.update(self.extra_params)
         if self.is_ollama() and "num_ctx" not in kwargs:
@@ -938,7 +1017,11 @@ class Model(ModelSettings):
                 }
 
                 _hash, response = self.send_completion(**kwargs)
-                if not response or not hasattr(response, "choices") or not response.choices:
+                if (
+                    not response
+                    or not hasattr(response, "choices")
+                    or not response.choices
+                ):
                     return None
                 res = response.choices[0].message.content
                 from aider.reasoning_tags import remove_reasoning_content
@@ -980,14 +1063,17 @@ def register_models(model_settings_fnames):
             for model_settings_dict in model_settings_list:
                 model_settings = ModelSettings(**model_settings_dict)
                 existing_model_settings = next(
-                    (ms for ms in MODEL_SETTINGS if ms.name == model_settings.name), None
+                    (ms for ms in MODEL_SETTINGS if ms.name == model_settings.name),
+                    None,
                 )
 
                 if existing_model_settings:
                     MODEL_SETTINGS.remove(existing_model_settings)
                 MODEL_SETTINGS.append(model_settings)
         except Exception as e:
-            raise Exception(f"Error loading model settings from {model_settings_fname}: {e}")
+            raise Exception(
+                f"Error loading model settings from {model_settings_fname}: {e}"
+            )
         files_loaded.append(model_settings_fname)
 
     return files_loaded
@@ -1064,7 +1150,9 @@ def sanity_check_model(io, model):
 
     elif not model.keys_in_environment:
         show = True
-        io.tool_warning(f"Warning for {model}: Unknown which environment variables are required.")
+        io.tool_warning(
+            f"Warning for {model}: Unknown which environment variables are required."
+        )
 
     # Check for model-specific dependencies
     check_for_dependencies(io, model.name)
