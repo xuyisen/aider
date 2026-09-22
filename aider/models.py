@@ -886,6 +886,14 @@ class Model(ModelSettings):
     def is_ollama(self):
         return self.name.startswith("ollama/") or self.name.startswith("ollama_chat/")
 
+    def supports_vision(self):
+        """Check if the model supports vision, falling back to checking the model name."""
+        supports_vision = self.info.get("supports_vision")
+        if supports_vision is not None:
+            return supports_vision
+        # Fallback: check if the model name contains 'vision'
+        return "vision" in self.name.lower()
+
     def github_copilot_token_to_open_ai_key(self, extra_headers):
         # check to see if there's an openai api key
         # If so, check to see if it's expire

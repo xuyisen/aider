@@ -23,9 +23,10 @@ from aider.waiting import Spinner
 
 # tree_sitter is throwing a FutureWarning
 warnings.simplefilter("ignore", category=FutureWarning)
-from grep_ast.tsl import USING_TSL_PACK, get_language, get_parser  # noqa: E402
+import tree_sitter
+from grep_ast.tsl import USING_TSL_PACK, get_language, get_parser
 
-Tag = namedtuple("Tag", "rel_fname fname line name kind".split())
+Tag = namedtuple("Tag", ["rel_fname", "fname", "line", "name", "kind"])
 
 
 SQLITE_ERRORS = (sqlite3.OperationalError, sqlite3.DatabaseError, OSError)
@@ -177,7 +178,7 @@ class RepoMap:
         """Handle SQLite errors by trying to recreate cache, falling back to dict if needed"""
 
         if self.verbose and original_error:
-            self.io.tool_warning(f"Tags cache error: {str(original_error)}")
+            self.io.tool_warning(f"Tags cache error: {original_error!s}")
 
         if isinstance(getattr(self, "TAGS_CACHE", None), dict):
             return
@@ -209,7 +210,7 @@ class RepoMap:
                 f"Unable to use tags cache at {path}, falling back to memory cache"
             )
             if self.verbose:
-                self.io.tool_warning(f"Cache recreation error: {str(e)}")
+                self.io.tool_warning(f"Cache recreation error: {e!s}")
 
         self.TAGS_CACHE = dict()
 
@@ -285,8 +286,8 @@ class RepoMap:
         tree = parser.parse(bytes(code, "utf-8"))
 
         # Run the tags queries
-        query = language.query(query_scm)
-        captures = query.captures(tree.root_node)
+        query = tree_sitter.Query(language, query_scm)
+        captures = tree_sitter.QueryCursor(query).captures(tree.root_node)
 
         saw = set()
         if USING_TSL_PACK:

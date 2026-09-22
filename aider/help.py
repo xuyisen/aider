@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import subprocess
 import warnings
 from pathlib import Path
 
@@ -15,9 +16,29 @@ from aider.help_pats import exclude_website_pats
 warnings.simplefilter("ignore", category=FutureWarning)
 
 
+def _is_local_checkout():
+    """Check if running from a local checkout vs. installed from PyPI."""
+    try:
+        repo_dir = subprocess.run(
+            ["git", "-C", str(Path(__file__).parent), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        return repo_dir.returncode == 0
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
+
 def install_help_extra(io):
+    if _is_local_checkout():
+        package_spec = ".[help]"
+    else:
+        package_spec = "aider-chat[help]"
+
     pip_install_cmd = [
-        "aider-chat[help]",
+        package_spec,
         "--extra-index-url",
         "https://download.pytorch.org/whl/cpu",
     ]

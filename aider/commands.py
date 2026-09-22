@@ -520,25 +520,23 @@ class Commands:
             cost = tk * (self.coder.main_model.info.get("input_cost_per_token") or 0)
             total_cost += cost
             msg = msg.ljust(col_width)
-            self.io.tool_output(f"${cost:7.4f} {fmt(tk)} {msg} {tip}")  # noqa: E231
+            self.io.tool_output(f"${cost:7.4f} {fmt(tk)} {msg} {tip}")
 
         self.io.tool_output("=" * (width + cost_width + 1))
-        self.io.tool_output(f"${total_cost:7.4f} {fmt(total)} tokens total")  # noqa: E231
+        self.io.tool_output(f"${total_cost:7.4f} {fmt(total)} tokens total")
 
         limit = self.coder.main_model.info.get("max_input_tokens") or 0
-        if not limit:
-            return
 
         remaining = limit - total
         if remaining > 1024:
             self.io.tool_output(f"{cost_pad}{fmt(remaining)} tokens remaining in context window")
         elif remaining > 0:
-            self.io.tool_error(
+            self.io.tool_output(
                 f"{cost_pad}{fmt(remaining)} tokens remaining in context window (use /drop or"
                 " /clear to make space)"
             )
         else:
-            self.io.tool_error(
+            self.io.tool_output(
                 f"{cost_pad}{fmt(remaining)} tokens remaining, window exhausted (use /drop or"
                 " /clear to make space)"
             )
@@ -867,9 +865,7 @@ class Commands:
                         f"Cannot add {matched_file} as it's not part of the repository"
                     )
             else:
-                if is_image_file(matched_file) and not self.coder.main_model.info.get(
-                    "supports_vision"
-                ):
+                if is_image_file(matched_file) and not self.coder.main_model.supports_vision():
                     self.io.tool_error(
                         f"Cannot add image file {matched_file} as the"
                         f" {self.coder.main_model.name} does not support images."
@@ -1162,19 +1158,19 @@ class Commands:
         raise CommandCompletionException()
 
     def cmd_ask(self, args):
-        """Ask questions about the code base without editing any files. If no prompt provided, switches to ask mode."""  # noqa
+        """Ask questions about the code base without editing any files. If no prompt provided, switches to ask mode."""
         return self._generic_chat_command(args, "ask")
 
     def cmd_code(self, args):
-        """Ask for changes to your code. If no prompt provided, switches to code mode."""  # noqa
+        """Ask for changes to your code. If no prompt provided, switches to code mode."""
         return self._generic_chat_command(args, self.coder.main_model.edit_format)
 
     def cmd_architect(self, args):
-        """Enter architect/editor mode using 2 different models. If no prompt provided, switches to architect/editor mode."""  # noqa
+        """Enter architect/editor mode using 2 different models. If no prompt provided, switches to architect/editor mode."""
         return self._generic_chat_command(args, "architect")
 
     def cmd_context(self, args):
-        """Enter context mode to see surrounding code context. If no prompt provided, switches to context mode."""  # noqa
+        """Enter context mode to see surrounding code context. If no prompt provided, switches to context mode."""
         return self._generic_chat_command(args, "context", placeholder=args.strip() or None)
 
     def _generic_chat_command(self, args, edit_format, placeholder=None):
@@ -1339,7 +1335,7 @@ class Commands:
                 self.io.tool_error(f"Not a file or directory: {abs_path}")
 
     def _add_read_only_file(self, abs_path, original_name):
-        if is_image_file(original_name) and not self.coder.main_model.info.get("supports_vision"):
+        if is_image_file(original_name) and not self.coder.main_model.supports_vision():
             self.io.tool_error(
                 f"Cannot add image file {original_name} as the"
                 f" {self.coder.main_model.name} does not support images."
@@ -1508,12 +1504,12 @@ class Commands:
             )
             self.io.tool_output(f"Copied last assistant message to clipboard. Preview: {preview}")
         except pyperclip.PyperclipException as e:
-            self.io.tool_error(f"Failed to copy to clipboard: {str(e)}")
+            self.io.tool_error(f"Failed to copy to clipboard: {e!s}")
             self.io.tool_output(
                 "You may need to install xclip or xsel on Linux, or pbcopy on macOS."
             )
         except Exception as e:
-            self.io.tool_error(f"An unexpected error occurred while copying to clipboard: {str(e)}")
+            self.io.tool_error(f"An unexpected error occurred while copying to clipboard: {e!s}")
 
     def cmd_report(self, args):
         "Report a problem by opening a GitHub Issue"
@@ -1635,12 +1631,12 @@ Just show me the edits I need to make.
             pyperclip.copy(markdown)
             self.io.tool_output("Copied code context to clipboard.")
         except pyperclip.PyperclipException as e:
-            self.io.tool_error(f"Failed to copy to clipboard: {str(e)}")
+            self.io.tool_error(f"Failed to copy to clipboard: {e!s}")
             self.io.tool_output(
                 "You may need to install xclip or xsel on Linux, or pbcopy on macOS."
             )
         except Exception as e:
-            self.io.tool_error(f"An unexpected error occurred while copying to clipboard: {str(e)}")
+            self.io.tool_error(f"An unexpected error occurred while copying to clipboard: {e!s}")
 
 
 def expand_subdir(file_path):
