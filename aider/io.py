@@ -1,6 +1,7 @@
 import base64
 import functools
 import os
+import contextlib
 import shutil
 import signal
 import subprocess
@@ -514,6 +515,23 @@ class InputOutput:
             self.interrupted = True
             self.prompt_session.app.exit()
 
+    @contextlib.contextmanager
+    def with_history_disabled(self):
+        """Temporarily disable input history, so confirm/prompt responses
+        don't pollute the saved input history."""
+        orig_buf_append = None
+        buf = None
+        try:
+            if self.prompt_session:
+                buf = getattr(self.prompt_session, 'default_buffer', None)
+                if buf is not None and hasattr(buf, 'append_to_history'):
+                    orig_buf_append = buf.append_to_history
+                    buf.append_to_history = lambda: None
+            yield
+        finally:
+            if orig_buf_append is not None and buf is not None:
+                buf.append_to_history = orig_buf_append
+
     def get_input(
         self,
         root,
@@ -863,11 +881,12 @@ class InputOutput:
             while True:
                 try:
                     if self.prompt_session:
-                        res = self.prompt_session.prompt(
-                            question,
-                            style=style,
-                            complete_while_typing=False,
-                        )
+                        with self.with_history_disabled():
+                            res = self.prompt_session.prompt(
+                                question,
+                                style=style,
+                                complete_while_typing=False,
+                            )
                     else:
                         res = input(question)
                 except EOFError:
@@ -933,12 +952,13 @@ class InputOutput:
         else:
             try:
                 if self.prompt_session:
-                    res = self.prompt_session.prompt(
-                        question + " ",
-                        default=default,
-                        style=style,
-                        complete_while_typing=True,
-                    )
+                    with self.with_history_disabled():
+                        res = self.prompt_session.prompt(
+                            question + " ",
+                            default=default,
+                            style=style,
+                            complete_while_typing=True,
+                        )
                 else:
                     res = input(question + " ")
             except EOFError:

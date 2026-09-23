@@ -148,6 +148,17 @@ class ModelInfoManager:
         self.local_model_metadata = {}
         self.verify_ssl = True
         self._cache_loaded = False
+        self._load_local_model_metadata()
+
+    def _load_local_model_metadata(self):
+        """Load bundled model metadata from package resources."""
+        try:
+            with importlib.resources.open_text("aider.resources", "model-metadata.json") as f:
+                data = json5.loads(f.read())
+                if data:
+                    self.local_model_metadata.update(data)
+        except Exception:
+            pass
 
     def set_verify_ssl(self, verify_ssl):
         self.verify_ssl = verify_ssl
@@ -236,7 +247,38 @@ class ModelInfoManager:
             if openrouter_info:
                 return openrouter_info
 
-        return cached_info
+        if cached_info:
+            return cached_info
+
+        # Robust local fallback: resolve required context fields (e.g.
+        # max_input_tokens) for common model families even when no metadata
+        # is available locally or remotely.
+        return self._get_local_fallback_info(model)
+
+    def _get_local_fallback_info(self, model):
+        """Generate fallback model info for common model families when no
+        metadata is available, so required context fields (e.g.
+        max_input_tokens) always resolve gracefully."""
+        model_lower = model.lower()
+
+        # OpenAI GPT-4 family: 8K context by default, with a 32K variant
+        if "gpt-4" in model_lower:
+            context = 32 * 1024 if "32k" in model_lower else 8 * 1024
+            return self._fallback_info(context)
+
+        # OpenAI GPT-3.5 family: 16K context
+        if "gpt-3.5" in model_lower:
+            return self._fallback_info(16385)
+
+        return {}
+
+    @staticmethod
+    def _fallback_info(context):
+        return {
+            "max_tokens": context,
+            "max_input_tokens": context,
+            "max_output_tokens": context,
+        }
 
     def fetch_openrouter_model_info(self, model):
         """
@@ -314,6 +356,10 @@ class Model(ModelSettings):
 
         # Are all needed keys/params available?
         res = self.validate_environment()
+
+        # Fallback: if the model name contains "vision", mark it as vision-capable
+        if not self.info.get("supports_vision") and "vision" in model.lower():
+            self.info["supports_vision"] = True
         self.missing_keys = res.get("missing_keys")
         self.keys_in_environment = res.get("keys_in_environment")
 

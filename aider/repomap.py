@@ -283,8 +283,22 @@ class RepoMap:
         tree = parser.parse(bytes(code, "utf-8"))
 
         # Run the tags queries
-        query = language.query(query_scm)
-        captures = query.captures(tree.root_node)
+        try:
+            from tree_sitter import Query, QueryCursor
+        except ImportError:
+            QueryCursor = None
+        
+        if QueryCursor is not None:
+            try:
+                query = Query(language, query_scm)
+                cursor = QueryCursor(query)
+                captures = cursor.captures(tree.root_node)
+            except Exception:
+                query = language.query(query_scm)
+                captures = query.captures(tree.root_node)
+        else:
+            query = language.query(query_scm)
+            captures = query.captures(tree.root_node)
 
         saw = set()
         if USING_TSL_PACK:
