@@ -15,4 +15,8 @@ aider/_version.py
 .venv/
 .#*
 .gitattributes
-tmp.benchmarks/
+tmp.benchmarks/# Shell redirection artifacts
+=[0-9]*
+>[0-9]*
+*.tmp
+*.log

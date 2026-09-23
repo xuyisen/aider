@@ -862,9 +862,7 @@ class Commands:
                         f"Cannot add {matched_file} as it's not part of the repository"
                     )
             else:
-                if is_image_file(matched_file) and not self.coder.main_model.info.get(
-                    "supports_vision"
-                ):
+                if is_image_file(matched_file) and not self._model_supports_vision():
                     self.io.tool_error(
                         f"Cannot add image file {matched_file} as the"
                         f" {self.coder.main_model.name} does not support images."
@@ -1333,8 +1331,16 @@ class Commands:
             else:
                 self.io.tool_error(f"Not a file or directory: {abs_path}")
 
+    def _model_supports_vision(self):
+        """Check if the current model supports vision."""
+        supports_vision = self.coder.main_model.info.get("supports_vision")
+        if supports_vision:
+            return True
+        # Fallback: check if model name suggests vision capability
+        return "vision" in self.coder.main_model.name.lower()
+
     def _add_read_only_file(self, abs_path, original_name):
-        if is_image_file(original_name) and not self.coder.main_model.info.get("supports_vision"):
+        if is_image_file(original_name) and not self._model_supports_vision():
             self.io.tool_error(
                 f"Cannot add image file {original_name} as the"
                 f" {self.coder.main_model.name} does not support images."

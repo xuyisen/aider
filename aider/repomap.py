@@ -25,6 +25,12 @@ from aider.utils import Spinner
 warnings.simplefilter("ignore", category=FutureWarning)
 from grep_ast.tsl import USING_TSL_PACK, get_language, get_parser  # noqa: E402
 
+# tree-sitter >=0.25 uses QueryCursor API
+try:
+    from tree_sitter import QueryCursor as _QueryCursor
+except ImportError:
+    _QueryCursor = None
+
 Tag = namedtuple("Tag", "rel_fname fname line name kind".split())
 
 
@@ -284,14 +290,31 @@ class RepoMap:
 
         # Run the tags queries
         query = language.query(query_scm)
-        captures = query.captures(tree.root_node)
 
         saw = set()
-        if USING_TSL_PACK:
+        if _QueryCursor is not None:
+            # tree-sitter >=0.25 API
+            try:
+                cursor = _QueryCursor(query)
+                if cursor is None:
+                    raise ValueError("QueryCursor returned None")
+                captures = cursor.captures(tree.root_node)
+                all_nodes = []
+                for tag, nodes in captures.items():
+                    all_nodes += [(node, tag) for node in nodes]
+            except Exception:
+                # Fallback to query.captures if cursor path fails
+                captures = query.captures(tree.root_node)
+                all_nodes = []
+                for tag, nodes in captures.items():
+                    all_nodes += [(node, tag) for node in nodes]
+        elif USING_TSL_PACK:
+            captures = query.captures(tree.root_node)
             all_nodes = []
             for tag, nodes in captures.items():
                 all_nodes += [(node, tag) for node in nodes]
         else:
+            captures = query.captures(tree.root_node)
             all_nodes = list(captures)
 
         for node, tag in all_nodes:
