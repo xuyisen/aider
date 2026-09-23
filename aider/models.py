@@ -150,6 +150,7 @@ class ModelInfoManager:
         self.local_model_metadata = {}
         self.verify_ssl = True
         self._cache_loaded = False
+        self._load_local_model_metadata()
 
         # Manager for the cached OpenRouter model database
         self.openrouter_manager = OpenRouterModelManager()
@@ -198,10 +199,27 @@ class ModelInfoManager:
             except OSError:
                 pass
 
+    def _load_local_model_metadata(self):
+        """Load bundled model metadata shipped with the package."""
+        try:
+            with importlib.resources.open_text("aider.resources", "model-metadata.json") as f:
+                data = json5.loads(f.read())
+                if data:
+                    self.local_model_metadata.update(data)
+        except Exception:
+            pass
+
     def get_model_from_cached_json_db(self, model):
         data = self.local_model_metadata.get(model)
         if data:
             return data
+
+        # Handle provider-prefixed lookups e.g. 'openai/gpt-4-32k'
+        pieces = model.split("/")
+        if len(pieces) == 2:
+            data = self.local_model_metadata.get(pieces[1])
+            if data and data.get("litellm_provider") == pieces[0]:
+                return data
 
         # Ensure cache is loaded before checking content
         self._load_cache()
@@ -324,6 +342,12 @@ class Model(ModelSettings):
         )
 
         self.info = self.get_model_info(model)
+
+        # Some models (e.g. gpt-4-vision-preview) have been removed from the model
+        # info database, but clearly support image input based on their name.
+        # Make sure they are treated as vision-capable everywhere.
+        if not self.info.get("supports_vision") and "vision" in model.lower():
+            self.info["supports_vision"] = True
 
         # Are all needed keys/params available?
         res = self.validate_environment()

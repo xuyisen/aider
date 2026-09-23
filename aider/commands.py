@@ -526,20 +526,22 @@ class Commands:
         self.io.tool_output(f"${total_cost:7.4f} {fmt(total)} tokens total")  # noqa: E231
 
         limit = self.coder.main_model.info.get("max_input_tokens") or 0
+        remaining = limit - total if limit else 0
         if not limit:
+            self.io.tool_output(f"{cost_pad}{fmt(0)} tokens remaining in context window")
+            self.io.tool_output(f"{cost_pad}{fmt(0)} tokens max context window size")
             return
 
-        remaining = limit - total
         if remaining > 1024:
             self.io.tool_output(f"{cost_pad}{fmt(remaining)} tokens remaining in context window")
         elif remaining > 0:
-            self.io.tool_error(
+            self.io.tool_output(
                 f"{cost_pad}{fmt(remaining)} tokens remaining in context window (use /drop or"
                 " /clear to make space)"
             )
         else:
-            self.io.tool_error(
-                f"{cost_pad}{fmt(remaining)} tokens remaining, window exhausted (use /drop or"
+            self.io.tool_output(
+                f"{cost_pad}{fmt(0)} tokens remaining, window exhausted (use /drop or"
                 " /clear to make space)"
             )
         self.io.tool_output(f"{cost_pad}{fmt(limit)} tokens max context window size")

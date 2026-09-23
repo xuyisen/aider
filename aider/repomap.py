@@ -286,15 +286,21 @@ class RepoMap:
 
         # Run the tags queries
         query = language.query(query_scm)
-        captures = query.captures(tree.root_node)
+
+        # tree-sitter 0.25+ removed Query.captures() in favor of QueryCursor
+        try:
+            from tree_sitter import QueryCursor
+            captures = QueryCursor(query).captures(tree.root_node)
+            # QueryCursor.captures() returns a dict: {capture_name: [nodes]}
+            all_nodes = [
+                (node, tag) for tag, nodes in captures.items() for node in nodes
+            ]
+        except ImportError:
+            # tree-sitter < 0.25: query.captures() returns list of (node, capture_name)
+            captures = query.captures(tree.root_node)
+            all_nodes = list(captures)
 
         saw = set()
-        if USING_TSL_PACK:
-            all_nodes = []
-            for tag, nodes in captures.items():
-                all_nodes += [(node, tag) for node in nodes]
-        else:
-            all_nodes = list(captures)
 
         for node, tag in all_nodes:
             if tag.startswith("name.definition."):
