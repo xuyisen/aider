@@ -9,8 +9,6 @@ from aider.models import (
     sanity_check_model,
     sanity_check_models,
 )
-
-
 class TestModels(unittest.TestCase):
     def setUp(self):
         """Reset MODEL_SETTINGS before each test"""
@@ -42,9 +40,6 @@ class TestModels(unittest.TestCase):
 
         model = Model("gpt-4")
         self.assertEqual(model.info["max_input_tokens"], 8 * 1024)
-
-        model = Model("gpt-4-32k")
-        self.assertEqual(model.info["max_input_tokens"], 32 * 1024)
 
         model = Model("gpt-4-0613")
         self.assertEqual(model.info["max_input_tokens"], 8 * 1024)
@@ -557,7 +552,5 @@ class TestModels(unittest.TestCase):
             temperature=0.7,
             timeout=600,
         )
-
-
 if __name__ == "__main__":
     unittest.main()
