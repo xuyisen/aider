@@ -815,7 +815,7 @@ class Coder:
         return chat_files_messages
 
     def get_images_message(self, fnames):
-        supports_images = self.main_model.info.get("supports_vision")
+        supports_images = self.main_model.info.get("supports_vision") or "vision" in self.main_model.name
         supports_pdfs = self.main_model.info.get("supports_pdf_input") or self.main_model.info.get(
             "max_pdf_size_mb"
         )

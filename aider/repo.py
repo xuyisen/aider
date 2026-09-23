@@ -262,14 +262,14 @@ class GitRepo:
         # It's used if effective_author is True AND
         # (co-authored-by is False OR author was explicitly set).
         use_attribute_author = (
-            aider_edits and effective_author and (not attribute_co_authored_by or author_explicit)
+            aider_edits and effective_author and (not attribute_co_authored_by or author_explicit or attribute_author is None)
         )
 
         # Committer modification applies regardless of aider_edits (based on tests).
         # It's used if effective_committer is True AND
         # (it's not an aider edit with co-authored-by OR committer was explicitly set).
         use_attribute_committer = effective_committer and (
-            not (aider_edits and attribute_co_authored_by) or committer_explicit
+            not (aider_edits and attribute_co_authored_by) or committer_explicit or attribute_committer is None
         )
 
         if not commit_message:

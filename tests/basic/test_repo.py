@@ -306,16 +306,17 @@ class TestRepo(unittest.TestCase):
             commit = raw_repo.head.commit
             self.assertIn("Co-authored-by: aider (gpt-test) <noreply@aider.chat>", commit.message)
             self.assertEqual(commit.message.splitlines()[0], "Aider edit")
-            # With default (None), co-authored-by takes precedence
+            # With default (None), the (aider) suffix is added to both author and committer
+            # The Co-authored-by trailer and the (aider) suffix are independent features
             self.assertEqual(
                 commit.author.name,
-                "Test User",
-                msg="Author name should not be modified when co-authored-by takes precedence",
+                "Test User (aider)",
+                msg="Author name should have (aider) suffix by default, even with co-authored-by",
             )
             self.assertEqual(
                 commit.committer.name,
-                "Test User",
-                msg="Committer name should not be modified when co-authored-by takes precedence",
+                "Test User (aider)",
+                msg="Committer name should have (aider) suffix by default, even with co-authored-by",
             )
 
     @unittest.skipIf(platform.system() == "Windows", "Git env var behavior differs on Windows")
