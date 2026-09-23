@@ -157,6 +157,20 @@ class ModelInfoManager:
         # Manager for the cached OpenRouter model database
         self.openrouter_manager = OpenRouterModelManager()
 
+        # Load bundled model metadata as fallback
+        self._load_local_model_metadata()
+
+    def _load_local_model_metadata(self):
+        """Load bundled model-metadata.json as fallback for model info."""
+        try:
+            with importlib.resources.open_text("aider.resources", "model-metadata.json") as f:
+                metadata = json5.load(f)
+            if isinstance(metadata, dict):
+                self.local_model_metadata.update(metadata)
+        except Exception:
+            # If the resource is missing or corrupt, fall back to empty metadata
+            pass
+
     def set_verify_ssl(self, verify_ssl):
         self.verify_ssl = verify_ssl
         if hasattr(self, "openrouter_manager"):
@@ -979,7 +993,9 @@ class Model(ModelSettings):
 
             self.github_copilot_token_to_open_ai_key(kwargs["extra_headers"])
 
-        res = litellm.completion(tools=[{"googleSearch": {}}], **kwargs)
+        if "tools" not in kwargs:
+            kwargs["tools"] = [{"googleSearch": {}}]
+        res = litellm.completion(**kwargs)
         return hash_object, res
 
     def simple_send_with_retries(self, messages):

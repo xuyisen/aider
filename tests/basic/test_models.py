@@ -444,6 +444,7 @@ class TestModels(unittest.TestCase):
             temperature=0,
             num_ctx=expected_ctx,
             timeout=600,
+            tools=[{'googleSearch': {}}],
         )
 
     @patch("aider.models.litellm.completion")
@@ -462,6 +463,7 @@ class TestModels(unittest.TestCase):
             temperature=0,
             num_ctx=4096,
             timeout=600,
+            tools=[{'googleSearch': {}}],
         )
 
     @patch("aider.models.litellm.completion")
@@ -478,6 +480,7 @@ class TestModels(unittest.TestCase):
             stream=False,
             temperature=0,
             timeout=600,
+            tools=[{'googleSearch': {}}],
         )
         self.assertNotIn("num_ctx", mock_completion.call_args.kwargs)
 
@@ -508,6 +511,7 @@ class TestModels(unittest.TestCase):
             stream=False,
             temperature=0,
             timeout=600,  # Default timeout
+            tools=[{'googleSearch': {}}],
         )
 
     @patch("aider.models.litellm.completion")
@@ -523,6 +527,7 @@ class TestModels(unittest.TestCase):
             stream=False,
             temperature=0,
             timeout=300,  # From extra_params
+            tools=[{'googleSearch': {}}],
         )
 
     @patch("aider.models.litellm.completion")
@@ -537,6 +542,7 @@ class TestModels(unittest.TestCase):
             stream=False,
             temperature=0,
             timeout=600,
+            tools=[{'googleSearch': {}}],
         )
 
         # Test use_temperature=False doesn't send temperature
@@ -556,6 +562,7 @@ class TestModels(unittest.TestCase):
             stream=False,
             temperature=0.7,
             timeout=600,
+            tools=[{'googleSearch': {}}],
         )
 
 

@@ -23,6 +23,7 @@ from aider.waiting import Spinner
 
 # tree_sitter is throwing a FutureWarning
 warnings.simplefilter("ignore", category=FutureWarning)
+from tree_sitter import QueryCursor  # noqa: E402
 from grep_ast.tsl import USING_TSL_PACK, get_language, get_parser  # noqa: E402
 
 Tag = namedtuple("Tag", "rel_fname fname line name kind".split())
@@ -286,7 +287,17 @@ class RepoMap:
 
         # Run the tags queries
         query = language.query(query_scm)
-        captures = query.captures(tree.root_node)
+        try:
+            if QueryCursor is not None:
+                cursor = QueryCursor(query)
+                captures = cursor.captures(tree.root_node)
+            else:
+                raise TypeError('QueryCursor is None')
+        except Exception:
+            if hasattr(query, 'captures'):
+                captures = query.captures(tree.root_node)
+            else:
+                return
 
         saw = set()
         if USING_TSL_PACK:
